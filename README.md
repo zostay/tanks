@@ -6,7 +6,7 @@ comes along for the ride.
 
 ## Components
 
-The tanks have been desigend to have these components in common:
+The tanks have been designed to have these components in common:
 
 1. ARES: The Autonomic and Rule Enforcement System. A Raspberry Pi Zero to
    provide the main functions for driving the robot. This is responsible for
