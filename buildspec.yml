@@ -1,0 +1,29 @@
+---
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      docker: 18
+      python: 3.7
+  pre_build:
+    commands:
+      - echo Installing boto3...
+      - pip install boto3
+      - echo Logging into ECR...
+      - $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
+
+  build:
+    commands:
+      - echo Build starting on `date`
+      - echo Build the docker image...
+      - docker buildx build rpi-rakudo-star -t $BASE_IMAGE_REPO_NAME:latest
+      - docker build firmware -t $TANK_IMAGE_REPO_NAME:latest
+
+  post_build:
+    commands:
+      - echo Build complete on `date`
+      - echo Pushing base build to ECR...
+      - docker push $BASE_IMAGE_REPO_NAME:latest
+      - echo Pushing tank build to ECR...
+      - docker push $TANK_IMAGE_REPO_NAME:latest
