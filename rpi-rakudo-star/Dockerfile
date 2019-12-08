@@ -15,5 +15,6 @@ RUN perl Configure.pl --backend=moar --gen-moar
 RUN make 
 RUN make install
 
-# echo "export PATH=$(pwd)/install/bin/:$(pwd)/install/share/perl6/site/bin:\$PATH" >> ~/.bashrc
-# source ~/.bashrc
+ENV PATH="/rakudo/install/bin:/rakudo/install/sahre/perl6/site/bin:${PATH}"
+
+ENTRYPOINT [ 'perl6' ]
