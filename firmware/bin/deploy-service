@@ -1,0 +1,134 @@
+#!/usr/bin/env perl6
+
+use v6;
+
+our $DEPLOYER-HOME = %*ENV<DEPLOYER_HOME> // ~($*CWD.add('deployer'));
+our $DEPLOYER-DESTINATION = %*ENV<DEPLOYER_DESTINATION> // "/Volumes/HypriotOS".IO;
+
+
+role ConfigObject { }
+class DeploymentConfig does ConfigObject { ... }
+
+my DeploymentConfig $config;
+
+sub template-file(IO::Path $file) {
+    sub zostay-secret($name) {
+        run(qqw<zostay-get-secret $name>, :out).out.lines.first;
+    }
+
+    sub b64($str) {
+        use Base64;
+        encode-base64($str, :str);#.comb(/ . ** 1..76 /).join("\n");
+    }
+
+    sub file($path) {
+        "$DEPLOYER-HOME/$path".IO.slurp;
+    }
+
+    sub config(*@names) {
+        my $this-config = $config;
+        for @names -> $name {
+            die "no configuration found for <@names.join(' ')>"
+                unless $this-config ~~ ConfigObject
+                   and $this-config.^can($name);
+
+            $this-config = $this-config."$name"();
+        }
+        $this-config;
+    }
+
+    $file.slurp.subst(/
+            $<sp> = [ ^^ \s* ]?
+        "\{\{\{"
+            $<ml> = [ "|" ]?
+            $<code> = [ [ <-[\}]> | "}" <!before "}}"> ]+ ]
+        "}}}"
+    /, {
+        my $sp   = ~$<sp>;
+        my $ml   = ~$<ml>;
+        my $code = ~$<code>;
+
+        use MONKEY-SEE-NO-EVAL;
+        my $content = EVAL $code;
+
+        if $content ~~ / "\n" / {
+            if $ml {
+                $content .= indent($sp.chars);
+            }
+            else {
+                $content .= trans(['"', "\n", "\r"] => ['\\"', "\\r", "\\n"]);
+                $content = qq[$sp"$content"];
+            }
+        }
+        else {
+            $content = "$sp$content";
+        }
+
+        $content
+    }, :g);
+}
+
+class DeploymentConfig {
+    class Wifi does ConfigObject {
+        has Str $.ssid is required;
+        has Str $.password is required;
+    }
+
+    class File does ConfigObject {
+        has Str $.name is required;
+        has Str $.destination;
+
+        method destination(--> Str) {
+            $.destination // $.name
+        }
+    }
+
+    has Str $.username is required;
+    has Str $.password is required;
+
+    has Wifi $.wifi is required;
+    has Hash[File] $.files is required;
+
+    method from-file(::?CLASS:U: IO::Path $filename) {
+        use Config::TOML;
+
+        my $original = $filename.slurp;
+
+        my %config = $filename.slurp.&template-file.&from-toml;
+        %config<wifi> = Wifi.new(|%config<wifi>);
+        self.new(|%config);
+    }
+}
+
+sub MAIN(
+    Str $hostname,
+    Str :$config,
+    Str :$root = $DEPLOYER-HOME,
+    Str :$destination = $DEPLOYER-DESTINATION,
+) {
+    my $root-dir = $root.IO;
+    my $config-file = do with $config {
+        $config.IO;
+    }
+    else {
+        $root-dir.add('deploy.toml');
+    }
+
+    say "Root directory: $root-dir";
+    print "Reading configuration $config-file ... ";
+    $config .= from-file($config-file);
+    say "Done.";
+
+    for $config.files -> $file {
+        print "Reading $file.name() ... ";
+        my $raw-file = $root-dir.add($file.name).slurp;
+        my $rendered-file = $raw-file.&template-file;
+
+        print "Writing $file.destination() ... ";
+        $destination.add($file.destination).spurt($rendered-file);
+
+        say "Done.";
+    }
+
+    say "It is finished.";
+}
