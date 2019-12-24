@@ -1,0 +1,12 @@
+[Unit]
+Description = ARES Firmware
+Requires = docker.service
+After = docker.service
+
+[Service]
+Restart = always
+ExecStart = /usr/bin/docker start -a zostay/tank-ares
+ExecStop = /usr/bin/docker stop -t 2 zostay/tank-ares
+
+[Install]
+WantedBy = local.target

@@ -9,9 +9,9 @@ our $DEPLOYER-DESTINATION = %*ENV<DEPLOYER_DESTINATION> // "/Volumes/HypriotOS".
 role ConfigObject { }
 class DeploymentConfig does ConfigObject { ... }
 
-my DeploymentConfig $config;
+my DeploymentConfig $*CONFIG;
 
-sub template-file(IO::Path $file) {
+sub template-config-file(IO::Path $file) {
     sub zostay-secret($name) {
         run(qqw<zostay-get-secret $name>, :out).out.lines.first;
     }
@@ -21,12 +21,17 @@ sub template-file(IO::Path $file) {
         encode-base64($str, :str);#.comb(/ . ** 1..76 /).join("\n");
     }
 
+    multi template-file(Str $file) { template-file($file.IO) }
+    multi template-file(IO::Path $file) {
+        template-config-file($*CONFIG.root-dir.add($file));
+    }
+
     sub file($path) {
-        "$DEPLOYER-HOME/$path".IO.slurp;
+        $*CONFIG.dest-dir.add($path).slurp;
     }
 
     sub config(*@names) {
-        my $this-config = $config;
+        my $this-config = $*CONFIG;
         for @names -> $name {
             die "no configuration found for <@names.join(' ')>"
                 unless $this-config ~~ ConfigObject
@@ -39,7 +44,7 @@ sub template-file(IO::Path $file) {
 
     $file.slurp.subst(/
             $<sp> = [ ^^ \s* ]?
-        "\{\{\{"
+        '{{{'
             $<ml> = [ "|" ]?
             $<code> = [ [ <-[\}]> | "}" <!before "}}"> ]+ ]
         "}}}"
@@ -79,24 +84,32 @@ class DeploymentConfig {
         has Str $.destination;
 
         method destination(--> Str) {
-            $.destination // $.name
+            $!destination // $!name
         }
     }
+
+    has Str $.hostname is required;
+
+    has IO::Path $.root-dir is required;
+    has IO::Path $.dest-dir is required;
 
     has Str $.username is required;
     has Str $.password is required;
 
     has Wifi $.wifi is required;
-    has Hash[File] $.files is required;
+    has Array[File] $.files is required;
 
-    method from-file(::?CLASS:U: IO::Path $filename) {
+    method from-file(::?CLASS:U:
+        IO::Path $filename,
+        *%overrides,
+        --> DeploymentConfig:D
+    ) {
         use Config::TOML;
 
-        my $original = $filename.slurp;
-
-        my %config = $filename.slurp.&template-file.&from-toml;
+        my %config = $filename.&template-config-file.&from-toml;
         %config<wifi> = Wifi.new(|%config<wifi>);
-        self.new(|%config);
+        %config<files> = Array[File].new(|%config<files>.map({ File.new(|$_) }));
+        self.new(|%config, |%overrides);
     }
 }
 
@@ -114,19 +127,27 @@ sub MAIN(
         $root-dir.add('deploy.toml');
     }
 
-    say "Root directory: $root-dir";
+    my $dest-dir = $destination.IO;
+
+    say "Root directory: $root-dir.absolute()";
+    say "Destination directory: $dest-dir.absolute()";
     print "Reading configuration $config-file ... ";
-    $config .= from-file($config-file);
+    $*CONFIG .= from-file($config-file,
+        :$hostname,
+        :$root-dir,
+        :$dest-dir,
+    );
     say "Done.";
 
-    for $config.files -> $file {
-        print "Reading $file.name() ... ";
-        my $raw-file = $root-dir.add($file.name).slurp;
-        my $rendered-file = $raw-file.&template-file;
+    for $*CONFIG.files -> $file {
+        my $src-file = $root-dir.add($file.name);
+        print "Reading deployment file $src-file ... ";
+        my $rendered-file = $src-file.&template-config-file;
+        say "Done.";
 
-        print "Writing $file.destination() ... ";
-        $destination.add($file.destination).spurt($rendered-file);
-
+        my $dest-file = $dest-dir.add($file.destination);
+        print "Writing deployment file $dest-file ... ";
+        $dest-file.spurt($rendered-file);
         say "Done.";
     }
 

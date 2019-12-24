@@ -1,0 +1,9 @@
+username = 'tanker'
+password = 'tankerface'
+
+[wifi]
+ssid = 'Hanenfast'
+password = '{{{zostay-secret('HANENFAST_WIFI_PASSWORD')}}}'
+
+[[files]]
+name = 'user-data'
