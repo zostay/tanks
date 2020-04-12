@@ -2,8 +2,8 @@ username = 'tanker'
 password = 'tankerface'
 
 [wifi]
-ssid = 'Hanenfast'
-password = '{{{zostay-secret('HANENFAST_WIFI_PASSWORD')}}}'
+ssid = '{{{zostay-secret('TANK_WIFI_SSID')}}}'
+password = '{{{zostay-secret('TANK_WIFI_PASSWORD')}}}'
 
 [[files]]
 name = 'user-data'

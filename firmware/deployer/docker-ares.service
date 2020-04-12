@@ -5,6 +5,7 @@ After = docker.service
 
 [Service]
 Restart = always
+ExecStartPre = /usr/bin/docker pull zostay/tank-ares
 ExecStart = /usr/bin/docker start -a zostay/tank-ares
 ExecStop = /usr/bin/docker stop -t 2 zostay/tank-ares
 
