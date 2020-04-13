@@ -1,0 +1,14 @@
+{
+    "name": "Tank",
+    "version": "0.0.0",
+    "description": "ARES Firmeware for Tanks",
+    "authors": [ "Sterling Hanenkamp <hanenkamp@cpan.org>" ],
+    "perl": "6.d",
+    "resources": [
+    ],
+    "provides": {
+    },
+    "depends": [],
+    "test-depends": [ "Test" ],
+    "source-url": "git://github.com/zostay/tanks.git"
+}

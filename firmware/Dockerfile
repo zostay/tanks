@@ -1,9 +1,12 @@
-FROM zostay/rakudo:latest
+FROM zostay/rakudo:latest AS build-container
 
-RUN mkdir -p /firmware
+ADD . /build
+WORKDIR /build
 
-COPY /bin /firmware/bin
+RUN zef install --force-test .
 
-WORKDIR /firmware
+FROM zostay/rakudo:latest AS run-container
 
-CMD ["/firmware/bin/tank-firmware"]
+COPY --from=build-container /usr/share/raku/site /usr/share/raku/site
+
+CMD ["/usr/share/raku/site/bin/tank-firmware"]
