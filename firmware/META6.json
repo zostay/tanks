@@ -7,6 +7,7 @@
     "resources": [
     ],
     "provides": {
+        "Tank": "lib/Tank.pm6"
     },
     "depends": [],
     "test-depends": [ "Test" ],
