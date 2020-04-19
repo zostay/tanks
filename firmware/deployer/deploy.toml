@@ -7,3 +7,7 @@ password = '{{{zostay-secret('TANK_WIFI_PASSWORD')}}}'
 
 [[files]]
 name = 'user-data'
+
+[flash]
+cloud-init = 'user-data'
+firmware-img = 'https://github.com/hypriot/image-builder-rpi/releases/download/v1.12.0/hypriotos-rpi-v1.12.0.img.zip'

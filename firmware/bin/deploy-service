@@ -2,9 +2,17 @@
 
 use v6;
 
-our $DEPLOYER-HOME = %*ENV<DEPLOYER_HOME> // ~($*CWD.add('deployer'));
-our $DEPLOYER-DESTINATION = %*ENV<DEPLOYER_DESTINATION> // "/Volumes/HypriotOS".IO;
+constant $TANKS-HOME = $*HOME.add("projects/0/tanks");
+constant $FIRMWARE-NAME= "firmware";
+constant $DEPLOYER-NAME = "deployer";
 
+# Depends on https://github.com/hypriot/flash
+sub flash-firmware(:$cwd, :$cloud-init, :$firmware-img) {
+    run :$cwd, 'flash', '-u', $cloud-init, $firmware-img;
+}
+
+sub firmware-home(IO::Path:D $tanks-home --> IO::Path:D) { $tanks-home.add($FIRMWARE-NAME) }
+sub deployer-home(IO::Path:D $tanks-home --> IO::Path:D) { firmware-home($tanks-home).add($DEPLOYER-NAME) }
 
 role ConfigObject { }
 class DeploymentConfig does ConfigObject { ... }
@@ -91,13 +99,14 @@ class DeploymentConfig {
     has Str $.hostname is required;
 
     has IO::Path $.root-dir is required;
-    has IO::Path $.dest-dir is required;
 
     has Str $.username is required;
     has Str $.password is required;
 
     has Wifi $.wifi is required;
     has Array[File] $.files is required;
+
+    has %.flash is required;
 
     method from-file(::?CLASS:U:
         IO::Path $filename,
@@ -114,7 +123,7 @@ class DeploymentConfig {
 }
 
 sub banner() {
-    say Q:to/END_OF_AWESOME/;
+    say Q:to/END_OF_AWESOMENESS/;
 
     TANK SETUP SCRIPT INITATING!!!
 
@@ -133,15 +142,27 @@ sub banner() {
     END_OF_AWESOMENESS
 }
 
+sub make-tempdir(Str:D $name --> IO::Path:D) {
+    my $dir-name = $name.subst("X", {
+        ('a'..'z', 'A'..'Z', '0'..'9').flat.pick
+    }, :global);
+    my $tmp = $*TMPDIR.add($dir-name);
+    $tmp.mkdir;
+}
+
+sub remove-tempdir(IO::Path:D $dir) {
+    use File::Directory::Tree;
+    rmtree $dir;
+}
+
 sub MAIN(
     Str $hostname,
     Str :$config,
-    Str :$root = $DEPLOYER-HOME,
-    Str :$destination = $DEPLOYER-DESTINATION,
+    Str :$root = ~$TANKS-HOME,
 ) {
     banner;
 
-    my $root-dir = $root.IO;
+    my $root-dir = deployer-home($root.IO);
     my $config-file = do with $config {
         $config.IO;
     }
@@ -149,15 +170,18 @@ sub MAIN(
         $root-dir.add('deploy.toml');
     }
 
-    my $dest-dir = $destination.IO;
+    my $build-dir = make-tempdir('build-dir-XXXXXXXXXX');
+    LEAVE {
+        say "Cleaning up build directory.";
+        remove-tempdir($build-dir);
+    }
 
     say "Root directory: $root-dir.absolute()";
-    say "Destination directory: $dest-dir.absolute()";
+    say "Build directory: $build-dir.absolute()";
     print "Reading configuration $config-file ... ";
     $*CONFIG .= from-file($config-file,
         :$hostname,
         :$root-dir,
-        :$dest-dir,
     );
     say "Done.";
 
@@ -167,11 +191,13 @@ sub MAIN(
         my $rendered-file = $src-file.&template-config-file;
         say "Done.";
 
-        my $dest-file = $dest-dir.add($file.destination);
-        print "Writing deployment file $dest-file ... ";
+        my $dest-file = $build-dir.add($src-file.basename);
+        print "Writing build file $dest-file ... ";
         $dest-file.spurt($rendered-file);
         say "Done.";
     }
+
+    flash-firmware(:cwd($build-dir), |$*CONFIG.flash);
 
     say "It is finished.";
 }
