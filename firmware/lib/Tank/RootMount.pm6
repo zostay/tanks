@@ -16,13 +16,11 @@ method remount(Writability:D $how --> True) {
     if $how eq 'rw' && self.is-mounted-ro {
         die "unable to remount $.root mount read-write";
     }
-
-    True
 }
 
 method is-mounted-ro(--> Bool:D) {
     my $p = run 'mount', :out;
-    for $p.lines -> $mtab-line {
+    for $p.out.lines -> $mtab-line {
         my ($dev, $, $path, $, $type, $opts) = $mtab-line.split(' ');
         next unless $path eq $.root;
 

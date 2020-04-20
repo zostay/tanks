@@ -7,6 +7,7 @@ fi
 
 docker buildx build \
     --platform amd64,arm \
+    --progress plain \
     -t "zostay/tank-ares-firmware:latest" \
     $ADDITIONAL_TAG \
     "--push" \

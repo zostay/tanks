@@ -1,5 +1,7 @@
 use v6;
 
+use Tank::RootMount;
+
 unit class Tank:ver<0.0.0>:auth<github:zostay>;
 
 has Supply $.stop-signal;
@@ -28,8 +30,8 @@ method boot() {
     say "Configuring signal handlers.";
     self.setup-signal-handlers;
 
-    say "Checking root mount options.";
-    self.check-root-mount;
+    # say "Checking root mount options.";
+    # self.check-root-mount;
 }
 
 method got-signal($s) {
@@ -42,7 +44,7 @@ method shutdown($op) {
 method run() {
     react {
         # We have various UDP packet signals
-        whenever $.cnd.Supply {
+        whenever $.cnc.Supply {
             when 'reboot' { $.quit.keep('reboot') }
             when 'quit'   { $.quit.keep('halt') }
         }
