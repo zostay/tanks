@@ -13,25 +13,15 @@ method cnc(--> IO::Socket::Async) {
 }
 
 method setup-signal-handlers() {
-    $!stop-signal = signal(SIGQUIT, SIGINT);
-}
-
-method check-root-mount() {
-    my $mount = Tank::RootMount.new;
-    if $mount.is-mounted-ro {
-        say "Root is mounted read-only.";
-    }
-    else {
-        die "Cannot boot, root is mounted read-write. Please fix.";
-    }
+    $!stop-signal = Supply.merge(
+        signal(SIGQUIT),
+        signal(SIGINT),
+    );
 }
 
 method boot() {
     say "Configuring signal handlers.";
     self.setup-signal-handlers;
-
-    # say "Checking root mount options.";
-    # self.check-root-mount;
 }
 
 method got-signal($s) {
