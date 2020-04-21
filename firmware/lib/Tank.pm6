@@ -1,11 +1,11 @@
 use v6;
 
-use Tank::RootMount;
-
 unit class Tank:ver<0.0.0>:auth<github:zostay>;
 
 has Supply $.stop-signal;
 has Promise $.quit .= new;
+
+has Supplier $.messages .= new;
 
 has $!cnc;
 method cnc(--> IO::Socket::Async) {
@@ -20,26 +20,46 @@ method setup-signal-handlers() {
 }
 
 method boot() {
-    say "Configuring signal handlers.";
-    self.setup-signal-handlers;
-}
+    say "TankOS v{self.^ver()} booting... ";
 
-method got-signal($s) {
-    say "Received $s";
+    say "Configuring signal handlers.";
+
+    self.setup-signal-handlers;
+
+    say "Boot Sequence: COMPLETE";
 }
 
 method shutdown($op) {
 }
 
+method got-signal($s) {
+    start { $.messages.emit: "Received: $s" }
+}
+
+method activate(Str:D $system --> True) {
+    start { $.messages.emit: "$system: ACTIVE" }
+}
+
+method say(*@_ --> True) {
+    start { $.messages.emit: @_.join('') }
+}
+
 method run() {
+    say "Initiating final startup... ";
+
     react {
+        # Thisis the thing that outputs to the screen
+        whenever $.messages.Supply { .say }
+
+        self.activate: "Message Queue";
+
         # We have various UDP packet signals
         whenever $.cnc.Supply {
             when 'reboot' { $.quit.keep('reboot') }
             when 'quit'   { $.quit.keep('halt') }
         }
 
-        say "CNC Server is ready.";
+        self.activate: "Command and Control System";
 
         # Stop signals cause quitting
         whenever $.stop-signal -> $s {
@@ -47,7 +67,7 @@ method run() {
             $.quit.keep('halt');
         }
 
-        say "Stop signals are listening.";
+        self.activate: "Signal Listeners";
 
         # Do any required shutdown work and exit.
         whenever $.quit -> $op {
@@ -55,6 +75,10 @@ method run() {
             done;
         }
 
-        say "Locked and loaded.";
+        self.activate: "Finalizer";
+
+        self.say: "Tank systems are ONLINE. Ready to rock and roll.";
     }
+
+    say "Game Over, man! Game over!";
 }
