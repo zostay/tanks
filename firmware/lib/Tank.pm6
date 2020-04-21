@@ -39,16 +39,22 @@ method run() {
             when 'quit'   { $.quit.keep('halt') }
         }
 
+        say "CNC Server is ready.";
+
         # Stop signals cause quitting
         whenever $.stop-signal -> $s {
             self.got-signal($s);
             $.quit.keep('halt');
         }
 
+        say "Stop signals are listening.";
+
         # Do any required shutdown work and exit.
         whenever $.quit -> $op {
             self.shutdown($op);
             done;
         }
+
+        say "Locked and loaded.";
     }
 }
